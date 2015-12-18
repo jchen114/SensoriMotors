@@ -1,0 +1,255 @@
+function [network] = train_neural_network(network, nn_inputs, nn_outputs, epochs, training_rounds)
+% inputs could be a cell where each element contains a matrix
+% outputs is a cell that matches each input
+
+%% Initialization
+layers = network.number_of_layers;
+
+% Assert that the number of inputs and outputs are the same.
+assert(length(nn_inputs) == length(nn_outputs), 'Input output pairs must match');
+
+% Normalize input output data to be between 0 and 1
+for data = 1 : length(nn_inputs)
+    input = nn_inputs{data};
+    output = nn_outputs{data};
+    input = bsxfun(@rdivide, bsxfun(@minus, input, min(input,[],1)), max(input,[],1) - min(input, [], 1));
+    output = bsxfun(@rdivide, bsxfun(@minus, output, min(output,[],1)), max(output,[],1) - min(output,[],1));
+    nn_inputs{data} = input;
+    nn_outputs{data} = output;
+end
+
+%% Break into training, and validation tests.
+
+validation = 0;
+training_in = nn_inputs;
+training_out = nn_outputs;
+threshold = 100;
+if (length(nn_inputs) > 100)
+    indices = ceil(0.95*length(nn_inputs));
+    training_in = nn_inputs(1:indices);
+    training_out = nn_outputs(1:indices);
+    validation_in = nn_inputs(indices+1:end);
+    validation_out = nn_outputs(indices+1:end);
+    validation = 1;
+end
+
+%% Initial Pass of the network
+% Assume inputs are a mxn matrix where each row is an input vector.
+% Randomly get an input output pair
+rand_index = randi([1 length(training_in)], 1, 1);
+nn_input = training_in(rand_index);
+nn_output = training_out(rand_index);
+nn_input = nn_input{1};
+nn_output = nn_output{1};
+size_of_inputs = size(nn_input,2);
+[error, yhat, outputs, pre_activation] = network_pass(nn_input, nn_output, network);
+str = sprintf('errors:\n %ld\n %ld\n %ld\n %ld\n %ld\n %ld\n %ld\n %ld\n %ld\n %ld\n %ld\n %ld\n', error(1), error(2),error(3),error(4),error(5),error(6),error(7),error(8),error(9),error(10),error(11),error(12));
+fprintf(str);
+% Store the initial error pass.
+training_errors = zeros(size_of_inputs, epochs);
+errors = zeros(size_of_inputs, epochs);
+num_nodes = network.hidden_layer_size;
+% objective function is just 1/2*(y - yhat)^2
+
+for epoch = 1 : epochs
+    %% Begin Training
+    training_error = zeros(size_of_inputs, 1);
+    new_network = network;
+    for training = 1 : training_rounds
+    % Begin with the output layer. Calculate gradients on the W
+    grad_weights = cell(layers-1,1);
+    gradsigmfs = cell(num_nodes, 1);
+    grad_biases = cell(layers-1,1);
+    
+    for node = 1 : num_nodes
+        % Get the gradients
+        de = -(nn_output(node, :) - yhat(node, :));
+        gradsigmf = arrayfun(@(x) sigmfderiv(x), pre_activation{length(pre_activation)}{node});
+        gradsigmf = de.*gradsigmf;
+        grad_biases{layers-1}{node} = gradsigmf;
+        gradsigmfs{node} = gradsigmf;
+        grad_w_node = repmat(gradsigmf, [num_nodes 1]);
+        grad_w_node = grad_w_node .* outputs{layers-2};
+        grad_weights{layers-1}{node} = grad_w_node;     
+    end
+    
+    % Get the average gradients with respect to each output for
+    % backpropagation
+    d_out = zeros(num_nodes, size_of_inputs);
+    for node = 1 : num_nodes
+        weights = network.layers{layers-1}.weights{node};
+        reptar = repmat(gradsigmfs{node}, [num_nodes 1]);
+        d_out = d_out + (reptar .* weights);    
+    end
+    d_out = 1/num_nodes * d_out; % Average of all the derivatives w.r.t outputs
+    
+    % Back propagate through the layers.
+    for layer = layers-2:-1: 1   
+        % Derivative with respect to weights.
+        for node = 1 : num_nodes
+            gradsigmf = arrayfun(@(x) sigmfderiv(x), pre_activation{layer}{node});
+            gradsigmfs{node} = gradsigmf;
+            grad_biases{layer}{node} = gradsigmf;
+            grad_w_node = repmat(gradsigmf, [num_nodes 1]) .* repmat(d_out(node,:), [num_nodes 1]);
+            if (layer ==1)
+                % Multiply by the inputs.
+                grad_w_node = grad_w_node .* nn_input;
+            else
+                grad_w_node = grad_w_node .* outputs{layer-1};
+            end
+            
+            grad_weights{layer}{node} = grad_w_node;
+        end
+        
+        % Derivative with respect to outputs for propagation
+        d_out = zeros(num_nodes,size_of_inputs);
+        for node = 1 : num_nodes
+            weights = network.layers{layer}.weights{node};
+            d_out = d_out + repmat(gradsigmfs{node}, [num_nodes 1]) .* weights;
+        end
+        d_out = 1/num_nodes * d_out; % Average the derivatives w.r.t outputs.
+        
+    end
+    
+    % Update the parameters, weights and biases.
+    alpha = 0.5; % step size
+    for layer = 1 : layers - 1
+        for node = 1 : num_nodes
+            network.layers{layer}.weights{node} = network.layers{layer}.weights{node} - (alpha *grad_weights{layer}{node});
+            network.layers{layer}.biases{node} = network.layers{layer}.biases{node} - (alpha * grad_biases{layer}{node});
+            [wr, wc] = find(isnan(network.layers{layer}.weights{node}));
+            [br,bc] = find(isnan(network.layers{layer}.biases{node}));
+            if (~isempty([wr,wc]))
+            end
+            if ~isempty()
+        end
+    end
+    
+    % select another random input output pair for network pass.
+    rand_index = randi([1 length(training_in)], 1, 1);
+    nn_input = training_in(rand_index);
+    nn_output = training_out(rand_index);
+    nn_input = nn_input{1};
+    nn_output = nn_output{1};
+    [error, yhat, outputs, pre_activation] = network_pass(nn_input, nn_output,network);
+    training_error(:) = training_error + error';
+    %str = sprintf('errors:\n %ld\n %ld\n %ld\n %ld\n %ld\n %ld\n %ld\n %ld\n %ld\n %ld\n %ld\n %ld\n', error(1), error(2),error(3),error(4),error(5),error(6),error(7),error(8),error(9),error(10),error(11),error(12));
+    %fprintf(str);
+    new_network = network;
+    end
+    
+    % Plot the errors
+    figure(1);
+    for dof = 1 : size_of_inputs
+        subplot(3,4,dof);
+        hold on;
+        plot(epoch, training_error(dof),'*');
+        xlabel('epoch');
+        ylabel('training error');
+        str = sprintf('Training errors for dof %d vs. Epoch', dof);
+        title(str);
+    end
+    
+    training_errors(:,epoch) = training_error;
+    
+    % Validation tests.
+    if (validation)
+        % perform validation tests
+        cumulative_error = zeros(size_of_inputs, 1);
+        for validate = 1 : length(validation_in)
+            % Pass through the network
+            v_in = validation_in{validate};
+            v_out = validation_out{validate};
+            [error, yhat, ~, ~] = network_pass(v_in, v_out, new_network);
+            %str = sprintf('validation errors:\n %ld\n %ld\n %ld\n %ld\n %ld\n %ld\n %ld\n %ld\n %ld\n %ld\n %ld\n %ld\n', error(1), error(2),error(3),error(4),error(5),error(6),error(7),error(8),error(9),error(10),error(11),error(12));
+            %fprintf(str);
+            cumulative_error = cumulative_error + error';
+        end
+        str = sprintf('Cumulative errors:\n %ld\n %ld\n %ld\n %ld\n %ld\n %ld\n %ld\n %ld\n %ld\n %ld\n %ld\n %ld\n', cumulative_error(1), cumulative_error(2),cumulative_error(3),cumulative_error(4),cumulative_error(5),cumulative_error(6),cumulative_error(7),cumulative_error(8),cumulative_error(9),cumulative_error(10),cumulative_error(11),cumulative_error(12));
+        fprintf(str);
+        errors(:,epoch) = cumulative_error;
+        figure(2);
+        for dof = 1 : size_of_inputs
+            subplot(3,4,dof);
+            hold on;
+            plot(epoch, cumulative_error(dof),'*');
+            xlabel('epoch');
+            ylabel('cumulative error');
+            str = sprintf('Cumulative errors for dof %d vs. Epoch', dof);
+            title(str);
+        end
+        if (cumulative_error < threshold)
+            % break
+        end
+    end
+    
+end
+
+fprintf('Training neural network finished\n');
+% % Plot the errors
+figure(3);
+for dof = 1 : size_of_inputs
+    subplot(3,4,dof);
+    xs = 1:epochs;
+    plot(xs, training_errors(dof,:),'-*');
+    xlabel('epoch');
+    ylabel('training error');
+    str = sprintf('Training errors for dof %d vs. Epoch', dof);
+    title(str);
+end
+
+figure(4);
+if (validation)
+    for dof = 1 : size_of_inputs
+        subplot(3,4,dof);
+        xs = 1:epochs;
+        plot(xs, errors(dof,:),'-*');
+        xlabel('epoch');
+        ylabel('cumulative error');
+        str = sprintf('Cumulative errors for dof %d vs. Epoch', dof);
+        title(str);
+    end
+end
+end
+
+function value = sigmfderiv(z)
+    value = exp(z)/(1 + exp(z))^2;
+end
+
+function [error, yhat, outputs, pre_activation] = network_pass(in, out, network)
+% Passes through the network with an input and output pair
+layers = network.number_of_layers;
+outputs = cell(layers-1,1);
+yhat = zeros(size(in,1));
+pre_activation = cell(layers-1, 1);
+num_nodes = network.hidden_layer_size;
+for layer = 1 : layers - 1
+    if (layer == 1)
+        propagated_data = cell(num_nodes, 1);
+        for node = 1 : num_nodes
+            propagated_data{node} = network.layers{layer}.weights{node}.*in;
+        end
+    else
+        combined_data = cell2mat(propagated_data);
+        for node = 1 : num_nodes
+            propagated_data{node} = network.layers{layer}.weights{node}.*combined_data;
+        end
+    end
+    
+    for node = 1 : num_nodes
+        % Compress into vector
+        propagated_data{node} = sum(propagated_data{node},1) + network.layers{layer}.biases{node};
+        pre_activation{layer}{node} = propagated_data{node};
+        % Pass through sigmoid function
+        propagated_data{node} = arrayfun(@(x) sigmf(x, [1 0]), propagated_data{node});
+    end
+   outputs{layer} = cell2mat(propagated_data);
+end
+
+yhat = cell2mat(propagated_data);
+
+%error = 1/2 * sum(sum((out - yhat).^2));
+error = 1/2 * (sum(out-yhat).^2);
+
+end
+

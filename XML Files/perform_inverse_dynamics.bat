@@ -1,0 +1,1 @@
+for /r %%G in (*.xml) do id -S "%%G"

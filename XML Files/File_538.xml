@@ -1,0 +1,13 @@
+<?xml version="1.0" ?>
+<OpenSimDocument Version="20302">
+	<InverseDynamicsTool name="File_538">
+		<results_directory>../Inverse Dynamics Output</results_directory>
+		<input_directory/>
+		<model_file>../../das3.osim</model_file>
+		<time_range>0	2.2414325848067738</time_range>
+		<forces_to_exclude>Muscles</forces_to_exclude>
+		<external_loads_file/>
+		<coordinates_file>..\Motion Files\File_538.mot</coordinates_file>
+		<output_gen_force_file>File_538.sto</output_gen_force_file>
+	</InverseDynamicsTool>
+</OpenSimDocument>

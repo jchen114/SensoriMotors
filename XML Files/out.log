@@ -1,0 +1,30 @@
+Constructing tool from setup file C:\users\jchen114\Dropbox\UBC\CPSC530P\Opensim\Dynamic Arm Simulation\Code\XML Files\File_9999.xml.
+
+-----------------------------------------------------------------------
+Starting Inverse Dynamics
+-----------------------------------------------------------------------
+-----------------------------------------------------------------------
+
+Loaded model DAS3 from file ../../das3.osim
+               MODEL: DAS3
+         coordinates: 11
+              forces: 150
+           actuators: 150
+             muscles: 150
+            analyses: 0
+              probes: 0
+              bodies: 14
+              joints: 13
+         constraints: 0
+             markers: 0
+         controllers: 0
+  contact geometries: 0
+misc modelcomponents: 0
+Running tool File_9999.
+
+Storage: file=..\Motion Files\File_9999.mot (nr=100 nc=12)
+No external loads will be applied (external loads file not specified).
+InverseDynamicsTool: 99 time frames in 0.021s
+
+Inverse dynamics compute time = 137ms
+
